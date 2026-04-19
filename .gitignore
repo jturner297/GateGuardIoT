@@ -1,0 +1,9 @@
+# Arduino
+*.ino.cpp
+*.elf
+*.hex
+*.bin
+
+# OS junk
+.DS_Store
+Thumbs.db
