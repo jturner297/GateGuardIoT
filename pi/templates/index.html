@@ -3,103 +3,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecureEdge Zero-Trust Hub</title>
+    <title>GateGuardIoT Zero-Trust Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-900 text-white font-sans p-8">
+<body class="bg-gray-900 text-gray-200 font-sans p-4 md:p-8 min-h-screen">
 
-    <div class="max-w-6xl mx-auto">
-        <div class="flex justify-between items-center border-b border-gray-700 pb-4 mb-8">
+    <div class="max-w-7xl mx-auto">
+        <div class="flex flex-col md:flex-row justify-between items-center border-b border-gray-700 pb-5 mb-8">
             <div>
-                <h1 class="text-3xl font-bold text-blue-400">SecureEdge Gateway</h1>
-                <p class="text-gray-400 text-sm mt-1">Zero-Trust Network Hub | Node 1</p>
+                <h1 class="text-3xl md:text-4xl font-extrabold text-blue-400 tracking-tight">GateGuardIoT Gateway</h1>
+                <p class="text-gray-400 text-sm mt-1 uppercase tracking-wider font-semibold">Zero-Trust Network Hub | Node 2 Active</p>
             </div>
-            <div class="flex items-center space-x-3">
-                <span id="connection-status" class="text-sm text-gray-400">Connecting...</span>
-                <div id="traffic-light" class="h-4 w-4 rounded-full bg-red-500"></div>
+            <div class="mt-4 md:mt-0 flex items-center space-x-6 bg-gray-800 py-2 px-4 rounded-lg border border-gray-700">
+                <button onclick="triggerSimulatedAttack()" class="bg-red-900 hover:bg-red-700 text-red-100 px-4 py-2 rounded text-xs md:text-sm font-bold border border-red-500 transition-colors shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                    Simulate Rogue Attack
+                </button>
+                <div class="flex items-center space-x-2">
+                    <span id="connection-status" class="text-sm font-mono text-gray-400">Awaiting Connection...</span>
+                    <div id="traffic-light" class="h-4 w-4 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)] transition-colors duration-200"></div>
+                </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
             
-            <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
-                <h2 class="text-xl font-semibold mb-4 text-green-400 flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Verified Telemetry (MPU6050)
-                </h2>
-                <div class="bg-gray-900 p-4 rounded font-mono text-sm h-64 flex flex-col justify-center items-center">
-                    <div class="text-gray-400 mb-2">Live Acceleration Data</div>
-                    <div id="live-data" class="text-3xl text-white font-bold tracking-widest">
-                        Awaiting Signal...
+            <div class="lg:col-span-3 bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-green-400 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Live MPU6050 Telemetry
+                    </h2>
+                    <div id="raw-data-readout" class="font-mono text-gray-400 text-xs bg-gray-900 py-1 px-3 rounded border border-gray-700">
+                        { Waiting for JSON Payload }
                     </div>
+                </div>
+                
+                <div class="bg-gray-900 p-4 rounded-lg h-80 relative border border-gray-800">
+                    <canvas id="telemetryChart"></canvas>
                 </div>
             </div>
 
-            <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-red-900">
-                <h2 class="text-xl font-semibold mb-4 text-red-500 flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                    Active Network Defense Log
-                </h2>
-                <div class="bg-gray-900 p-4 rounded font-mono text-xs h-64 overflow-y-auto" id="security-log">
-                    <div class="text-gray-500 italic pb-2">Firewall active. Monitoring for rogue devices...</div>
+            <div class="lg:col-span-2 bg-gray-800 p-6 rounded-xl shadow-2xl border border-red-900/50 relative">
+                <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                    <h2 class="text-xl font-semibold text-red-500 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        Active Defense Log
+                    </h2>
+                    <button onclick="clearLogs()" class="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 py-1 px-3 rounded transition-colors">Clear Logs</button>
+                </div>
+                
+                <div class="bg-gray-900 p-4 rounded-lg font-mono text-xs md:text-sm h-80 overflow-y-auto border border-gray-800 shadow-inner custom-scrollbar" id="security-log">
+                    <div class="text-green-500/50 italic pb-2 flex items-center border-b border-gray-800/50 mb-2">
+                        <span class="animate-pulse h-2 w-2 bg-green-500 rounded-full mr-2"></span>
+                        Firewall active. Monitoring for unauthorized MAC addresses...
+                    </div>
                 </div>
             </div>
 
         </div>
     </div>
 
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #111827; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #4B5563; }
+    </style>
+
     <script>
-        // Connect to the Flask-SocketIO server
         var socket = io();
         var trafficLight = document.getElementById('traffic-light');
-        var liveDataDisplay = document.getElementById('live-data');
         var securityLog = document.getElementById('security-log');
-        var connectionStatus = document.getElementById('connection-status');
+        var rawDataReadout = document.getElementById('raw-data-readout');
 
-        socket.on('connect', function() {
-            connectionStatus.innerText = "System Online";
-            trafficLight.classList.replace('bg-red-500', 'bg-yellow-500'); // Standby
+        // --- Chart.js Initialization ---
+        var ctx = document.getElementById('telemetryChart').getContext('2d');
+        var chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [], // Time labels for the X-axis
+                datasets: [
+                    { label: 'X-Axis (g)', borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', data: [], tension: 0.3, pointRadius: 2, borderWidth: 2 },
+                    { label: 'Y-Axis (g)', borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', data: [], tension: 0.3, pointRadius: 2, borderWidth: 2 },
+                    { label: 'Z-Axis (g)', borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', data: [], tension: 0.3, pointRadius: 2, borderWidth: 2 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { 
+                        grid: { color: 'rgba(55, 65, 81, 0.5)' }, 
+                        ticks: { color: '#9ca3af', font: { family: 'monospace' } },
+                        suggestedMin: -2.0,
+                        suggestedMax: 2.0
+                    },
+                    x: { display: false } 
+                },
+                plugins: { 
+                    legend: { labels: { color: '#e5e7eb', font: { size: 12 } } } 
+                },
+                animation: { duration: 0 }, 
+                interaction: { mode: 'index', intersect: false }
+            }
         });
 
-        // Listen for standard sensor data
-        socket.on('sensor_data', function(msg) {
-            // Flash the traffic indicator green
-            trafficLight.classList.replace('bg-yellow-500', 'bg-green-500');
-            trafficLight.classList.replace('bg-red-500', 'bg-green-500');
-            
-            // Update the display (assuming msg contains the payload string)
-            liveDataDisplay.innerText = msg.data || msg;
+        // --- Socket Events ---
+        
+        socket.on('connect', function() {
+            document.getElementById('connection-status').innerText = "System Online";
+            document.getElementById('connection-status').className = "text-sm font-mono text-green-400 font-bold";
+            trafficLight.className = "h-4 w-4 rounded-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.8)]";
+        });
 
-            // Reset light back to standby after 500ms
+        socket.on('sensor_data', function(msg) {
+            trafficLight.className = "h-4 w-4 rounded-full bg-green-500 shadow-[0_0_15px_rgba(34,197,94,1)]";
+            
+            let dataStr = msg.data || msg;
+            
+            try {
+                let parsed = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
+                rawDataReadout.innerText = JSON.stringify(parsed);
+
+                let timeNow = new Date().toLocaleTimeString();
+                chart.data.labels.push(timeNow);
+                chart.data.datasets[0].data.push(parsed.x);
+                chart.data.datasets[1].data.push(parsed.y);
+                chart.data.datasets[2].data.push(parsed.z);
+
+                if (chart.data.labels.length > 30) {
+                    chart.data.labels.shift();
+                    chart.data.datasets.forEach(dataset => dataset.data.shift());
+                }
+                
+                chart.update();
+            } catch (e) {
+                rawDataReadout.innerText = "Parse Error: " + dataStr;
+            }
+
             setTimeout(() => {
-                trafficLight.classList.replace('bg-green-500', 'bg-yellow-500');
+                trafficLight.className = "h-4 w-4 rounded-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.8)]";
             }, 500);
         });
 
-        // Listen for blocked rogue attempts
         socket.on('blocked_attempts', function(msg) {
-            // Flash the traffic indicator red
-            trafficLight.classList.replace('bg-yellow-500', 'bg-red-500');
-            trafficLight.classList.replace('bg-green-500', 'bg-red-500');
+            trafficLight.className = "h-4 w-4 rounded-full bg-red-500 shadow-[0_0_20px_rgba(239,68,68,1)]";
 
-            // Create a new log entry
             var newLog = document.createElement('div');
-            newLog.className = "text-red-400 border-b border-gray-800 py-2";
-            
-            // Generate a timestamp if one isn't provided
+            newLog.className = "text-red-400 border-b border-gray-800/80 py-3 animate-fade-in";
             var time = new Date().toLocaleTimeString();
-            var threatData = msg.data || msg;
-            newLog.innerHTML = `[${time}] <span class="text-white font-bold">BLOCKED:</span> ${threatData}`;
             
-            // Prepend to the top of the log list
+            newLog.innerHTML = `<span class="text-gray-500">[${time}]</span> <span class="text-white font-bold bg-red-900/50 px-1 rounded ml-1">BLOCKED:</span> ${msg.data || msg}`;
+            
             securityLog.prepend(newLog);
 
-            // Reset light back to standby after 500ms
             setTimeout(() => {
-                trafficLight.classList.replace('bg-red-500', 'bg-yellow-500');
+                trafficLight.className = "h-4 w-4 rounded-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.8)]";
             }, 500);
         });
+
+        // --- Interactive Button Functions ---
+        
+        function clearLogs() {
+            securityLog.innerHTML = '<div class="text-green-500/50 italic pb-2 flex items-center border-b border-gray-800/50 mb-2"><span class="animate-pulse h-2 w-2 bg-green-500 rounded-full mr-2"></span>Firewall active. Monitoring for unauthorized MAC addresses...</div>';
+        }
+
+        function triggerSimulatedAttack() {
+            socket.emit('simulate_attack', { command: 'execute' });
+            
+            var newLog = document.createElement('div');
+            newLog.className = "text-red-500 border-b border-gray-800/80 py-3 bg-red-900/20";
+            var time = new Date().toLocaleTimeString();
+            
+            var hex = "0123456789ABCDEF";
+            var fakeMac = "";
+            for(let i=0; i<6; i++) {
+                fakeMac += hex[Math.floor(Math.random() * 16)] + hex[Math.floor(Math.random() * 16)];
+                if(i < 5) fakeMac += ":";
+            }
+
+            newLog.innerHTML = `<span class="text-gray-500">[${time}]</span> <span class="text-white font-bold bg-red-600 px-1 rounded ml-1">SPOOF DETECTED:</span> Unauthorized MAC <span class="text-yellow-200">${fakeMac}</span> rejected.`;
+            securityLog.prepend(newLog);
+            
+            trafficLight.className = "h-4 w-4 rounded-full bg-red-600 shadow-[0_0_20px_rgba(220,38,38,1)]";
+            setTimeout(() => { trafficLight.className = "h-4 w-4 rounded-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.8)]"; }, 800);
+        }
     </script>
 </body>
 </html>
