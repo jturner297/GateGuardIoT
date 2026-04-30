@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureEdge Zero-Trust Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+</head>
+<body class="bg-gray-900 text-white font-sans p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center border-b border-gray-700 pb-4 mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-400">SecureEdge Gateway</h1>
+                <p class="text-gray-400 text-sm mt-1">Zero-Trust Network Hub | Node 1</p>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span id="connection-status" class="text-sm text-gray-400">Connecting...</span>
+                <div id="traffic-light" class="h-4 w-4 rounded-full bg-red-500"></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+                <h2 class="text-xl font-semibold mb-4 text-green-400 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Verified Telemetry (MPU6050)
+                </h2>
+                <div class="bg-gray-900 p-4 rounded font-mono text-sm h-64 flex flex-col justify-center items-center">
+                    <div class="text-gray-400 mb-2">Live Acceleration Data</div>
+                    <div id="live-data" class="text-3xl text-white font-bold tracking-widest">
+                        Awaiting Signal...
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-red-900">
+                <h2 class="text-xl font-semibold mb-4 text-red-500 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    Active Network Defense Log
+                </h2>
+                <div class="bg-gray-900 p-4 rounded font-mono text-xs h-64 overflow-y-auto" id="security-log">
+                    <div class="text-gray-500 italic pb-2">Firewall active. Monitoring for rogue devices...</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Connect to the Flask-SocketIO server
+        var socket = io();
+        var trafficLight = document.getElementById('traffic-light');
+        var liveDataDisplay = document.getElementById('live-data');
+        var securityLog = document.getElementById('security-log');
+        var connectionStatus = document.getElementById('connection-status');
+
+        socket.on('connect', function() {
+            connectionStatus.innerText = "System Online";
+            trafficLight.classList.replace('bg-red-500', 'bg-yellow-500'); // Standby
+        });
+
+        // Listen for standard sensor data
+        socket.on('sensor_data', function(msg) {
+            // Flash the traffic indicator green
+            trafficLight.classList.replace('bg-yellow-500', 'bg-green-500');
+            trafficLight.classList.replace('bg-red-500', 'bg-green-500');
+            
+            // Update the display (assuming msg contains the payload string)
+            liveDataDisplay.innerText = msg.data || msg;
+
+            // Reset light back to standby after 500ms
+            setTimeout(() => {
+                trafficLight.classList.replace('bg-green-500', 'bg-yellow-500');
+            }, 500);
+        });
+
+        // Listen for blocked rogue attempts
+        socket.on('blocked_attempts', function(msg) {
+            // Flash the traffic indicator red
+            trafficLight.classList.replace('bg-yellow-500', 'bg-red-500');
+            trafficLight.classList.replace('bg-green-500', 'bg-red-500');
+
+            // Create a new log entry
+            var newLog = document.createElement('div');
+            newLog.className = "text-red-400 border-b border-gray-800 py-2";
+            
+            // Generate a timestamp if one isn't provided
+            var time = new Date().toLocaleTimeString();
+            var threatData = msg.data || msg;
+            newLog.innerHTML = `[${time}] <span class="text-white font-bold">BLOCKED:</span> ${threatData}`;
+            
+            // Prepend to the top of the log list
+            securityLog.prepend(newLog);
+
+            // Reset light back to standby after 500ms
+            setTimeout(() => {
+                trafficLight.classList.replace('bg-red-500', 'bg-yellow-500');
+            }, 500);
+        });
+    </script>
+</body>
+</html>

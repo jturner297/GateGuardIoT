@@ -7,35 +7,42 @@ import paho.mqtt.client as mqtt
 
 # Creates instances of respective services
 app = Flask(__name__)
-socketio= SocketIO(app)
-mqtt_client = mqtt.Client()
+socketio = SocketIO(app)
+
+# Fixes the DeprecationWarning
+mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
 
 # Function that essentially allows for data to be seperated into topics such as sensor data
 def on_message(client, userdata, message):
 	# Converts raw bytes from MQTT into readable string
-	data = message.payload.decode('utf-8')
-	if message.topic == "secureedge/node1/accel":
+    data = message.payload.decode('utf-8')
+    
+    # Updated to catch Node 2!
+    if message.topic == "secureedge/node1/telemetry" or message.topic == "secureedge/node2/telemetry":
 		# Sends valid data to browser
-		socketio.emit('sensor_data', data)
-	else:
+        socketio.emit('sensor_data', {'data': data})
+        print(f"Pushed to UI: {data}")
+    elif message.topic == "secureedge/node1/blockedattempts":
 		# Sends blocked attempt data to browser 
-		socketio.emit('blocked_attempts', data)
+        socketio.emit('blocked_attempts', {'data': data})
+        print(f"Pushed Alert to UI: {data}")
+
 
 # Instance of MQTT running locally via port 1883 utilizing function on_message, subscribes to topics while running continuously via loop
 mqtt_client.connect("localhost", 1883)
 mqtt_client.on_message = on_message
-mqtt_client.subscribe("secureedge/node1/accel")
+
+# Subscribe to both nodes so you never miss data regardless of which ESP32 you use
+mqtt_client.subscribe("secureedge/node1/telemetry")
+mqtt_client.subscribe("secureedge/node2/telemetry")
 mqtt_client.subscribe("secureedge/node1/blockedattempts")
+
 mqtt_client.loop_start()
 
-# Will be used for future html file rendering
 @app.route('/')
 def index():
-	return render_template('index.html')
+    return render_template('index.html')
 
-socketio.run(app)
-
-
-
-
-
+if __name__ == '__main__':
+    print("Starting Flask Web Server on Port 5000...")
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

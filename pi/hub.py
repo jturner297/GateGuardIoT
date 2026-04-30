@@ -16,7 +16,7 @@ TRUSTED_DEVICES = {
 
 DATA_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 # We will just connect to the first device in our list for this demo
-TARGET_MAC = list(TRUSTED_DEVICES.keys())[0]
+TARGET_MAC = list(TRUSTED_DEVICES.keys())[1]
 
 async def main():
     print(f"Starting SecureEdge Sensor-Agnostic Hub...")
