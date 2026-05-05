@@ -4,9 +4,6 @@ import json
 import logging
 import time
 
-# ==========================================
-# CONFIGURATION - UPDATE THESE VALUES
-# ==========================================
 # 1. You can find this endpoint in AWS IoT Core -> Settings -> "Device data endpoint"
 AWS_ENDPOINT = "aom6z3jtu7isf-ats.iot.us-east-2.amazonaws.com"
 
@@ -26,9 +23,8 @@ logger.setLevel(logging.ERROR)
 streamHandler = logging.StreamHandler()
 logger.addHandler(streamHandler)
 
-# ==========================================
+
 # AWS CLOUD MQTT CLIENT SETUP
-# ==========================================
 print("Initializing AWS IoT Core connection...")
 myAWSIoTMQTTClient = AWSIoTMQTTClient(CLIENT_ID)
 myAWSIoTMQTTClient.configureEndpoint(AWS_ENDPOINT, 8883)
@@ -45,9 +41,7 @@ print(f"Connecting to AWS Endpoint: {AWS_ENDPOINT}...")
 myAWSIoTMQTTClient.connect()
 print("SUCCESS: Connected to AWS Cloud Broker.")
 
-# ==========================================
 # LOCAL MQTT CLIENT SETUP (THE BRIDGE)
-# ==========================================
 def on_local_message(client, userdata, message):
     """
     This function triggers every time your local hub.py validates a BLE packet
