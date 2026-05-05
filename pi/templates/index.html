@@ -27,10 +27,11 @@
             
             <div class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 flex flex-col">
                 <div class="flex justify-between items-center mb-6 border-b border-gray-700/50 pb-4">
-                    <h2 class="text-xl font-semibold text-green-400">
-                        <span id="sensor-name">Waiting for Sensor...</span>
-                    </h2>
-                    <span id="last-updated" class="text-xs text-gray-500 font-mono font-normal"></span>
+                <h2 class="text-xl font-semibold text-green-400 flex items-center">
+                    <span id="sensor-name">Waiting for Sensor...</span>
+                    <span id="mac-badge" class="ml-3 text-[10px] bg-gray-700 text-gray-300 px-2 py-1 rounded font-mono hidden border border-gray-600"></span>
+                </h2>
+            <span id="last-updated" class="text-xs text-gray-500 font-mono font-normal"></span>
                 </div>
                 
                 <div id="dynamic-widget-area" class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow">
@@ -89,25 +90,30 @@
                 let parsed = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
                 
                 // 1. Inject Timestamp
-                parsed.timestamp = new Date().toLocaleTimeString();
-                
-                // 2. Update Header Metadata
+        parsed.timestamp = new Date().toLocaleTimeString();
                 lastUpdatedText.innerText = "Last update: " + parsed.timestamp;
-                
-                // 3. Update the bottom payload console
                 rawDataReadout.innerText = JSON.stringify(parsed);
 
                 if (parsed.sensor) {
                     sensorNameTitle.innerText = "Live " + parsed.sensor + " Telemetry";
+                }
+                
+                // POPULATE MAC BADGE
+                if (parsed.mac_address) {
+                    let macBadge = document.getElementById('mac-badge');
+                    macBadge.innerText = parsed.mac_address;
+                    macBadge.classList.remove('hidden'); // Make it visible
                 }
 
                 if (widgetArea.innerHTML.includes("Waiting for telemetry")) {
                     widgetArea.innerHTML = "";
                 }
 
-                // 4. Build the UI Widgets
+                // --- TELEMETRY WIDGET GENERATION ---
                 for (const [key, value] of Object.entries(parsed)) {
-                    if (key === "sensor" || key === "timestamp") continue;
+                    
+                    // THE FIX: Add "mac_address" to the Metadata blocklist
+                    if (key === "sensor" || key === "timestamp" || key === "mac_address") continue;
 
                     let displayValue = typeof value === 'number' ? value.toFixed(2) : value;
                     let widgetId = 'widget-' + key;
@@ -144,7 +150,7 @@
         });
 
         function clearLogs() {
-            document.getElementById('security-log').innerHTML = '<div class="text-green-500/50 italic pb-2 flex items-center border-b border-gray-800/50 mb-2">Firewall active. Listening for payloads...</div>';
+            document.getElementById('security-log').innerHTML = '<div class="text-green-500/50 italic pb-2 flex items-center border-b border-gray-800/50 mb-2">Firewall active. Listening for rouge payloads...</div>';
         }
     </script>
 </body>
