@@ -8,6 +8,7 @@ __pycache__/
 # --- Security/Secrets ---
 # Ignore environment variables 
 .env
+config.json
 
 # --- Arduino / ESP32 ---
 *.ino.cpp
