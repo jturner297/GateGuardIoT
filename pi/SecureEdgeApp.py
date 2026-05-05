@@ -1,20 +1,16 @@
-# asyncio allows for running multiple background tasks (like checking sensors) simultaneously without freezing the system
-# json handles converting python dictionaries to JSON strings for AWS, and vice versa
-# os allows the script to navigate the file system to safely find config files regardless of where the script is run from
-# paho.mqtt.client allows Pi to connect to the local Mosquitto broker to feed the local web dashboard
-# AWSIoTPythonSDK allows Pi to securely punch through Amazon's Zero-Trust firewall using certificates
-# BleakClient handles the physical Bluetooth Low Energy (BLE) connections to the ESP32 nodes
-# datetime generates exact time records so we know exactly when an event occurred
-import asyncio
+# flask handles the web server and routing
+# flask_socketio allows the server to push real-time updates to your HTML page
+# paho.mqtt.client allows this script to listen to the Mosquitto broker fed by your bridge script
+# json and os handle the config loading and data parsing
+from flask import Flask, render_template
+from flask_socketio import SocketIO
+import paho.mqtt.client as mqtt
 import json
 import os
-import paho.mqtt.client as mqtt
-from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
-from bleak import BleakClient
-from datetime import datetime, timezone
 
 
 # 1. DYNAMIC CONFIGURATION
+
 # Smart Config Loader: Checks local folder first, then parent folder
 config_path = 'config.json'
 if not os.path.exists(config_path):
@@ -24,109 +20,83 @@ if not os.path.exists(config_path):
 with open(config_path, 'r') as f:
     config = json.load(f)
 
-# Determine the absolute directory where config.json lives
-base_dir = os.path.dirname(os.path.abspath(config_path))
+# Extract Flask parameters from your config
+FLASK_HOST = config["flask"]["host"]
+FLASK_PORT = config["flask"]["port"]
 
-# Extract Local and BLE variables from the config dictionary
-TRUSTED_DEVICES = config["trusted_devices"]
-DATA_CHAR_UUID = config["ble"]["data_char_uuid"]
+# Extract Local MQTT parameters
 LOCAL_BROKER = config["mqtt"]["broker"]
 LOCAL_PORT = config["mqtt"]["port"]
-ALERT_TOPIC = config["alert_topics"][0]
 
-# Extract AWS Zero-Trust variables and dynamically convert them to absolute paths
-AWS_ENDPOINT = config["aws"]["endpoint"]
-PATH_TO_ROOT = os.path.join(base_dir, config["aws"]["root_ca"])
-PATH_TO_KEY = os.path.join(base_dir, config["aws"]["private_key"])
-PATH_TO_CERT = os.path.join(base_dir, config["aws"]["device_cert"])
-CLIENT_ID = config["aws"]["client_id"]
-AWS_TOPIC_TELEMETRY = config["aws"]["cloud_telemetry_topic"]
-AWS_TOPIC_ALERTS = config["aws"]["cloud_alert_topic"]
+# Extract topics for the dashboard to monitor
+TRUSTED_DEVICES = config["trusted_devices"]
+TELEMETRY_TOPICS = list(TRUSTED_DEVICES.values()) # ["secureedge/node1/telemetry", ...]
+ALERT_TOPIC = config["alert_topics"][0]           # "secureedge/node1/blockedattempts"
 
 
-# 2. CLOUD & LOCAL CONNECTIONS
-print("Initializing AWS IoT Core connection...")
-aws_client = AWSIoTMQTTClient(CLIENT_ID)
-aws_client.configureEndpoint(AWS_ENDPOINT, 8883)
-aws_client.configureCredentials(PATH_TO_ROOT, PATH_TO_KEY, PATH_TO_CERT)
+# 2. FLASK & SOCKET.IO SETUP
 
-aws_client.configureOfflinePublishQueueing(-1)
-aws_client.configureDrainingFrequency(2)
-aws_client.configureConnectDisconnectTimeout(10)
-aws_client.configureMQTTOperationTimeout(5)
-aws_client.connect()
-print("SUCCESS: Connected to AWS Cloud Broker.")
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'gateguard_secret!'
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-print(f"Initializing Local MQTT (For Dashboard) at {LOCAL_BROKER}:{LOCAL_PORT}...")
-local_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1) 
-local_client.connect(LOCAL_BROKER, LOCAL_PORT)
+@app.route('/')
+def index():
+    # This serves your 'index.html' file located in the /templates folder
+    return render_template('index.html')
 
 
-# 3. THE CONCURRENT EDGE WORKER
-async def connect_to_device(mac_address, local_topic):
-    print(f"[{mac_address}] Scanning for node...")
+# 3. MQTT SUBSCRIBER (THE LISTENER)
+
+
+def on_connect(client, userdata, flags, rc):
+    print(f"Dashboard connected to Mosquitto at {LOCAL_BROKER} with result code {rc}")
     
-    while True: 
-        try:
-            async with BleakClient(mac_address) as client:
-                print(f"[{mac_address}] ALLOWED: Connected to Verified Device.")
-                
-                while True:
-                    raw_data = await client.read_gatt_char(DATA_CHAR_UUID)
-                    payload_str = raw_data.decode('utf-8')
-                    
-                    try:
-                        # 1. Parse the raw JSON payload from the hardware
-                        json_data = json.loads(payload_str)
-                        
-                        # 2. METADATA STAMPING: Inject MAC address AND Timestamp
-                        json_data["mac_address"] = mac_address
-                        
-                        # --- THE TIMESTAMP FIX ---
-                        # Injects an exact UTC timestamp into the JSON database envelope
-                        json_data["timestamp"] = datetime.now(timezone.utc).isoformat()
-                        
-                        # 3. Repackage the enriched JSON dictionary back into a string format
-                        enriched_payload = json.dumps(json_data)
-                        
-                        # 4a. Fire to Local Web Dashboard
-                        local_client.publish(local_topic, enriched_payload)
-                        # 4b. Fire to AWS DynamoDB
-                        aws_client.publish(AWS_TOPIC_TELEMETRY, enriched_payload, 1)
-                        
-                        local_time = datetime.now().strftime("%H:%M:%S")
-                        print(f"[{local_time}] [{mac_address}] ROUTED TO LOCAL & CLOUD: {enriched_payload}")
-                        
-                    except json.JSONDecodeError:
-                        print(f"[{mac_address}] BLOCKED: Malformed payload detected.")
-                        error_msg = f"Invalid JSON from {mac_address}"
-                        
-                        # Stamp the alert with a timestamp as well
-                        aws_alert_msg = json.dumps({
-                            "default": f"GATEGUARD INTRUSION: {error_msg}",
-                            "timestamp": datetime.now(timezone.utc).isoformat()
-                        })
-                        
-                        local_client.publish(ALERT_TOPIC, error_msg)
-                        aws_client.publish(AWS_TOPIC_ALERTS, aws_alert_msg, 1) 
-                        
-                    await asyncio.sleep(3)
-                    
-        except Exception as e:
-            print(f"[{mac_address}] Disconnected or out of range. Retrying in 5s...")
-            await asyncio.sleep(5)
+    # Subscribe to the telemetry topics for every node in your config
+    for topic in TELEMETRY_TOPICS:
+        client.subscribe(topic)
+        print(f"Subscribing to Telemetry Topic: {topic}")
+    
+    # Subscribe to the security alert topic
+    client.subscribe(ALERT_TOPIC)
+    print(f"Subscribing to Alert Topic: {ALERT_TOPIC}")
+
+def on_message(client, userdata, msg):
+    # This triggers when the Bridge script publishes data to Mosquitto
+    try:
+        payload_str = msg.payload.decode('utf-8')
+        data = json.loads(payload_str)
+        
+
+        # We need to emit the specific event name the HTML script is listening for
+        
+        if msg.topic == ALERT_TOPIC:
+            print(f"ALERT RECEIVED on {msg.topic}")
+            # Emits 'blocked_attempts' to match your HTML's socket.on('blocked_attempts')
+            socketio.emit('blocked_attempts', {'data': data})
+        
+        elif msg.topic in TELEMETRY_TOPICS:
+            print(f"DATA RECEIVED on {msg.topic}")
+            # Emits 'sensor_data' to match your HTML's socket.on('sensor_data')
+            socketio.emit('sensor_data', {'data': data})
+            
+    except Exception as e:
+        print(f"Error processing dashboard data: {e}")
+
+# Initialize the MQTT client for the Flask backend
+dashboard_mqtt = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+dashboard_mqtt.on_connect = on_connect
+dashboard_mqtt.on_message = on_message
 
 
 # 4. SYSTEM BOOTSTRAP
-async def main():
-    print(f"Starting GateGuard Edge Gateway...")
-    print(f"Loaded {len(TRUSTED_DEVICES)} trusted devices. Engaging Zero-Trust Protocols.")
-    
-    tasks = []
-    for mac, topic in TRUSTED_DEVICES.items():
-        tasks.append(connect_to_device(mac, topic))
-        
-    await asyncio.gather(*tasks)
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    # 1. Connect to the local broker
+    dashboard_mqtt.connect(LOCAL_BROKER, LOCAL_PORT, 60)
+    
+    # 2. Start the MQTT loop in a background thread
+    dashboard_mqtt.loop_start()
+    
+    # 3. Launch the Web Server using your config.json values
+    print(f"GateGuard Dashboard launching on http://{FLASK_HOST}:{FLASK_PORT}")
+    socketio.run(app, host=FLASK_HOST, port=FLASK_PORT, debug=False)
