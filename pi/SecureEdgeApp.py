@@ -7,7 +7,7 @@ import paho.mqtt.client as mqtt
 
 # Creates instances of respective services
 app = Flask(__name__)
-socketio = SocketIO(app)
+socketio = SocketIO(app, async_mode='threading')
 
 # Fixes the DeprecationWarning
 mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
