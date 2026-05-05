@@ -47,6 +47,10 @@ async def main():
                 except json.JSONDecodeError:
                     # If a hacker tries to inject malformed code, drop it.
                     print("BLOCKED: Malformed payload detected. Dropping packet.")
+                    error_msg = f"Invalid JSON from {TARGET_MAC}"
+                    mqtt_client.publish("secureedge/node1/blockedattempts", error_msg)
+                    print(f"BLOCKED: Malformed payload from {TARGET_MAC}. Alert sent to UI.")
+                    
                 
                 await asyncio.sleep(3)
                 
