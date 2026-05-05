@@ -1,10 +1,25 @@
-# Arduino
+# --- Python & Environment ---
+# Virtual environment
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Security/Secrets ---
+# Ignore environment variables 
+.env
+
+# --- Arduino / ESP32 ---
 *.ino.cpp
 *.elf
 *.hex
 *.bin
 
-# OS junk
+# --- IDEs and Editors ---
+# Ignores VS Code workspace settings 
+.vscode/
+
+# --- OS junk ---
 .DS_Store
 Thumbs.db
 

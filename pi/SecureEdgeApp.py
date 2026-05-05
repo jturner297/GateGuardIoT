@@ -10,6 +10,7 @@ app = Flask(__name__)
 
 # FIX: Explicitly set async_mode to 'threading'. 
 # This forces SocketIO to listen to the MQTT background thread so the data actually escapes the Pi.
+# The cors_allowed_origins="*" allows your external desktop browser to connect.
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Fixes the DeprecationWarning
