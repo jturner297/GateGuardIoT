@@ -144,7 +144,9 @@
             var newLog = document.createElement('div');
             newLog.className = "text-red-400 border-b border-gray-800/80 py-3 animate-pulse";
             var time = new Date().toLocaleTimeString();
-            newLog.innerHTML = `<span class="text-gray-500">[${time}]</span> <span class="text-white font-bold bg-red-900/50 px-1 rounded ml-1">BLOCKED:</span> ${msg.data || msg}`;
+            // Looks for the specific 'message' key we defined in the Python JSON payload
+            let alertText = msg.data.message || msg.data || msg;
+            newLog.innerHTML = `<span class="text-gray-500">[${time}]</span> <span class="text-white font-bold bg-red-900/50 px-1 rounded ml-1">BLOCKED:</span> ${alertText}`;
             document.getElementById('security-log').prepend(newLog);
             setTimeout(() => { trafficLight.className = "h-4 w-4 rounded-full bg-yellow-500"; }, 500);
         });
