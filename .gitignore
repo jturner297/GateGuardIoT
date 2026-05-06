@@ -10,6 +10,9 @@ __pycache__/
 .env
 config.json
 
+# Ignore Arduino/ESP32 secrets
+secrets.h
+
 # --- Arduino / ESP32 ---
 *.ino.cpp
 *.elf
