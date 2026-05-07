@@ -38,7 +38,7 @@ ALERT_TOPIC = config["alert_topics"][0]           # "secureedge/node1/blockedatt
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'gateguard_secret!'
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 @app.route('/')
 def index():

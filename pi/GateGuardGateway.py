@@ -65,7 +65,7 @@ print("SUCCESS: Connected to AWS Cloud.")
 local_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1) 
 local_client.connect(LOCAL_BROKER, LOCAL_PORT)
 
-
+local_client.loop_start()
 # 3. Edge processing
 
 # This asynchronous function handles the connection and routing for a single ESP32 node
