@@ -1,0 +1,34 @@
+{
+  "flask": {
+    "host": "0.0.0.0",
+    "port": 5000
+  },
+  "mqtt": {
+    "broker": "YOUR_LOCAL_MQTT_BROKER_IP",
+    "port": 1883
+  },
+  "ble": {
+    "data_char_uuid": "YOUR_BLE_CHARACTERISTIC_UUID_HERE"
+  },
+  "aws": {
+    "endpoint": "YOUR_AWS_IOT_ENDPOINT_HERE-ats.iot.us-east-2.amazonaws.com",
+    "root_ca": "./certs/AmazonRootCA1.pem",
+    "private_key": "./certs/private.pem.key",
+    "device_cert": "./certs/certificate.pem.crt",
+    "client_id": "YOUR_GATEWAY_CLIENT_ID",
+    "cloud_telemetry_topic": "YOUR/CLOUD/TELEMETRY/TOPIC",
+    "cloud_alert_topic": "YOUR/CLOUD/ALERT/TOPIC"
+  },
+  "trusted_devices": {
+    "XX:XX:XX:XX:XX:XX": "BME280_NODE",
+    "YY:YY:YY:YY:YY:YY": "MPU6050_NODE",
+    "ZZ:ZZ:ZZ:ZZ:ZZ:ZZ": "ROGUE_NODE"
+  },
+  "alert_topics": [
+    "secureedge/node1_alerts",
+    "secureedge/node2_alerts"
+  ],
+  "wildcard_topics": {
+    "local_telemetry": "local/telemetry/#"
+  }
+}
