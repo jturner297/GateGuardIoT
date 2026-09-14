@@ -16,8 +16,16 @@ bool deviceConnected = false;
 
 // Callback to track if the Pi has connected to us
 class MyServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) { deviceConnected = true; };
-    void onDisconnect(BLEServer* pServer) { deviceConnected = false; }
+    void onConnect(BLEServer* pServer) { 
+        deviceConnected = true; 
+    };
+    void onDisconnect(BLEServer* pServer) { 
+        deviceConnected = false; 
+        // --- THE FIX: Restart advertising when connection drops ---
+        delay(500); // Give the Bluetooth radio a half-second to reset
+        pServer->startAdvertising(); 
+        Serial.println("Connection dropped! Restarting BLE Advertising...");
+    }
 };
 
 void setup() {
@@ -61,12 +69,18 @@ void loop() {
   float p = bme.readPressure() / 100.0F;
 
   // Create a data string: "Temp,Hum,Pres"
-String dataString = "{\"sensor\":\"BME280\", \"temperature\":" + String(t) + ", \"humidity\":" + String(h) + ", \"pressure\":" + String(p) + "}";
+  String dataString = "{\"sensor\":\"BME280\", \"temperature\":" + String(t) + ", \"humidity\":" + String(h) + ", \"pressure\":" + String(p) + "}";
   
   // Update the BLE value
   pCharacteristic->setValue(dataString.c_str());
-  pCharacteristic->notify(); // Push data to the Pi if it's listening
-
-  Serial.println("Broadcasting BLE Data: " + dataString);
+  
+  // --- THE FIX: Only notify if the Pi is actively connected ---
+  if (deviceConnected) {
+      pCharacteristic->notify(); // Push data to the Pi if it's listening
+      Serial.println("Broadcasting BLE Data: " + dataString);
+  } else {
+      Serial.println("Waiting for Hub to reconnect...");
+  }
+  
   delay(3000);
 }

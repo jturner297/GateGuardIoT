@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GateGuardIoT Dynamic Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-200 font-sans p-4 md:p-8 min-h-screen flex flex-col">
+
+    <div class="max-w-7xl mx-auto w-full flex-grow">
+        <div class="flex flex-col md:flex-row justify-between items-center border-b border-gray-700 pb-5 mb-8">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-extrabold text-blue-400 tracking-tight">GateGuardIoT Gateway</h1>
+                <p class="text-gray-400 text-sm mt-1 uppercase tracking-wider font-semibold">Sensor-Agnostic Zero-Trust Hub</p>
+            </div>
+            <div class="mt-4 md:mt-0 flex items-center space-x-6 bg-gray-800 py-2 px-4 rounded-lg border border-gray-700">
+                <div class="flex items-center space-x-2">
+                    <span id="connection-status" class="text-sm font-mono text-gray-400">Awaiting Connection...</span>
+                    <div id="traffic-light" class="h-4 w-4 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)] transition-colors duration-200"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            
+            <div class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 flex flex-col">
+                <div class="flex justify-between items-center mb-6 border-b border-gray-700/50 pb-4">
+                <h2 class="text-xl font-semibold text-green-400 flex items-center">
+                    <span id="sensor-name">Waiting for Sensor...</span>
+                    <span id="mac-badge" class="ml-3 text-[10px] bg-gray-700 text-gray-300 px-2 py-1 rounded font-mono hidden border border-gray-600"></span>
+                </h2>
+            <span id="last-updated" class="text-xs text-gray-500 font-mono font-normal"></span>
+                </div>
+                
+                <div id="dynamic-widget-area" class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow">
+                    <div class="text-gray-500 italic">Waiting for telemetry payload...</div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-red-900/50 flex flex-col">
+                <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                    <h2 class="text-xl font-semibold text-red-500">Active Defense Log</h2>
+                    <button onclick="clearLogs()" class="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 py-1 px-3 rounded transition-colors">Clear</button>
+                </div>
+                <div class="bg-gray-900 p-4 rounded-lg font-mono text-xs md:text-sm h-64 overflow-y-auto border border-gray-800 flex-grow" id="security-log">
+                    <div class="text-green-500/50 italic pb-2 flex items-center border-b border-gray-800/50 mb-2">
+                        <span class="animate-pulse h-2 w-2 bg-green-500 rounded-full mr-2"></span>
+                        Firewall active. Listening for payloads...
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="bg-gray-800 p-5 rounded-xl shadow-2xl border border-gray-700">
+            <h3 class="text-xs uppercase tracking-widest text-gray-500 font-bold mb-3 flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                Raw Data Stream
+            </h3>
+            <div id="raw-data-readout" class="font-mono text-gray-400 text-sm bg-gray-900 py-3 px-4 rounded border border-gray-700 overflow-x-auto whitespace-nowrap">
+                { Waiting for telemetry connection... }
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        var socket = io();
+        var trafficLight = document.getElementById('traffic-light');
+        var widgetArea = document.getElementById('dynamic-widget-area');
+        var rawDataReadout = document.getElementById('raw-data-readout');
+        var sensorNameTitle = document.getElementById('sensor-name');
+        var lastUpdatedText = document.getElementById('last-updated');
+
+        socket.on('connect', function() {
+            document.getElementById('connection-status').innerText = "System Online";
+            document.getElementById('connection-status').className = "text-sm font-mono text-green-400 font-bold";
+            trafficLight.className = "h-4 w-4 rounded-full bg-yellow-500";
+        });
+
+        // --- THE DYNAMIC PAYLOAD RESOLVER ---
+        socket.on('sensor_data', function(msg) {
+            trafficLight.className = "h-4 w-4 rounded-full bg-green-500 shadow-[0_0_15px_rgba(34,197,94,1)]";
+            
+            let dataStr = msg.data || msg;
+            
+            try {
+                let parsed = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
+                
+                // 1. Inject Timestamp
+        parsed.timestamp = new Date().toLocaleTimeString();
+                lastUpdatedText.innerText = "Last update: " + parsed.timestamp;
+                rawDataReadout.innerText = JSON.stringify(parsed);
+
+                if (parsed.sensor) {
+                    sensorNameTitle.innerText = "Live " + parsed.sensor + " Telemetry";
+                }
+                
+                // POPULATE MAC BADGE
+                if (parsed.mac_address) {
+                    let macBadge = document.getElementById('mac-badge');
+                    macBadge.innerText = parsed.mac_address;
+                    macBadge.classList.remove('hidden'); // Make it visible
+                }
+
+                if (widgetArea.innerHTML.includes("Waiting for telemetry")) {
+                    widgetArea.innerHTML = "";
+                }
+
+                // --- TELEMETRY WIDGET GENERATION ---
+                for (const [key, value] of Object.entries(parsed)) {
+                    
+                    // THE FIX: Add "mac_address" to the Metadata blocklist
+                    if (key === "sensor" || key === "timestamp" || key === "mac_address") continue;
+
+                    let displayValue = typeof value === 'number' ? value.toFixed(2) : value;
+                    let widgetId = 'widget-' + key;
+                    let existingWidget = document.getElementById(widgetId);
+
+                    if (existingWidget) {
+                        document.getElementById('val-' + key).innerText = displayValue;
+                    } else {
+                        let newCard = `
+                            <div id="${widgetId}" class="bg-gray-900 border border-gray-700 p-4 rounded-lg flex flex-col items-center justify-center shadow-inner transition-all hover:border-blue-500">
+                                <span class="text-gray-400 text-xs uppercase tracking-widest font-bold mb-1">${key}</span>
+                                <span id="val-${key}" class="text-3xl font-mono text-white">${displayValue}</span>
+                            </div>
+                        `;
+                        widgetArea.innerHTML += newCard;
+                    }
+                }
+            } catch (e) {
+                rawDataReadout.innerText = "Parse Error: " + dataStr;
+            }
+
+            setTimeout(() => { trafficLight.className = "h-4 w-4 rounded-full bg-yellow-500"; }, 500);
+        });
+
+        // --- SECURITY LOG RESOLVER ---
+        socket.on('blocked_attempts', function(msg) {
+            trafficLight.className = "h-4 w-4 rounded-full bg-red-500 shadow-[0_0_20px_rgba(239,68,68,1)]";
+            var newLog = document.createElement('div');
+            newLog.className = "text-red-400 border-b border-gray-800/80 py-3 animate-pulse";
+            var time = new Date().toLocaleTimeString();
+            newLog.innerHTML = `<span class="text-gray-500">[${time}]</span> <span class="text-white font-bold bg-red-900/50 px-1 rounded ml-1">BLOCKED:</span> ${msg.data || msg}`;
+            document.getElementById('security-log').prepend(newLog);
+            setTimeout(() => { trafficLight.className = "h-4 w-4 rounded-full bg-yellow-500"; }, 500);
+        });
+
+        function clearLogs() {
+            document.getElementById('security-log').innerHTML = '<div class="text-green-500/50 italic pb-2 flex items-center border-b border-gray-800/50 mb-2">Firewall active. Listening for rouge payloads...</div>';
+        }
+    </script>
+</body>
+</html>
